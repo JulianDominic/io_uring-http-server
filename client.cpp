@@ -4,8 +4,6 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-char buffer[1024];
-
 int main(void) {
     int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
     sockaddr_in serverAddress;
@@ -19,10 +17,12 @@ int main(void) {
     const char* message = "i'm the client";
     send(clientSocket, message, strlen(message), 0);
     while (true) {
-        int bytes_recv = recv(clientSocket, buffer, 2048, 0);
+        char buffer[1024];
+        int bytes_recv = recv(clientSocket, buffer, 1024, 0);
         if (bytes_recv > 0) {
             std::cout << "Server response: " << buffer << std::endl;
-            break;        
+        } else {
+            break;
         }
     }
     close(clientSocket);
