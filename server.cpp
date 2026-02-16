@@ -39,7 +39,7 @@ void close_connection(struct io_uring &ring, Connection *&conn);
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
-        perror("Port number required: ./server <port>\n");
+        std::cout << "Port number required: ./server <port>" << std::endl;
         return EXT_ERR_PORT_MISSING;
     }
     // create socket
