@@ -132,7 +132,7 @@ void recv_request(struct io_uring &ring, signed int &fd) {
     io_uring_prep_recv(recvSQE, clientConn->fd, clientConn->buffer, MAX_BUFFER_SIZE, 0);
     io_uring_sqe_set_data(recvSQE, clientConn);
     if (io_uring_submit(&ring) < 0) {
-        perror("Failed to submit READ_REQUEST as SQE\n");
+        perror("Failed to submit RECV_REQUEST as SQE\n");
     }
 }
 
@@ -142,7 +142,7 @@ void send_response(struct io_uring &ring, Connection *&conn, int &bytesRead) {
     io_uring_prep_send(sendSQE, conn->fd, conn->buffer, bytesRead, 0);
     io_uring_sqe_set_data(sendSQE, conn);
     if (io_uring_submit(&ring) < 0) {
-        perror("Failed to submit WRITE_RESPONSE as SQE\n");
+        perror("Failed to submit SEND_RESPONSE as SQE\n");
     }
 }
 
