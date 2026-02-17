@@ -33,8 +33,8 @@ struct Connection {
     int file_fd;
 };
 
-void read_request(struct io_uring &ring, signed int &fd);
-void write_response(struct io_uring &ring, Connection *&conn, int &bytesRead);
+void recv_request(struct io_uring &ring, signed int &fd);
+void send_response(struct io_uring &ring, Connection *&conn, int &bytesRead);
 void close_connection(struct io_uring &ring, Connection *&conn);
 
 int main(int argc, char *argv[]) {
@@ -102,12 +102,12 @@ int main(int argc, char *argv[]) {
         switch (conn->type) {
             case OpType::ACCEPT: {
                 std::cout << "New FD: " << cqe->res << std::endl;
-                read_request(ring, cqe->res);
+                recv_request(ring, cqe->res);
                 break;
             }
             case OpType::READ_REQUEST: {
                 std::cout << conn->buffer << std::endl;
-                write_response(ring, conn, cqe->res);
+                send_response(ring, conn, cqe->res);
                 break;
             }
             case OpType::WRITE_RESPONSE: {
@@ -124,23 +124,23 @@ int main(int argc, char *argv[]) {
     }
 }
 
-void read_request(struct io_uring &ring, signed int &fd) {
+void recv_request(struct io_uring &ring, signed int &fd) {
     // create a new connection struct instead of modifying the existing one because it is a multishot accept
     Connection *clientConn = new Connection{ fd, OpType::READ_REQUEST };
     memset(clientConn->buffer, 0, MAX_BUFFER_SIZE);
-    struct io_uring_sqe *readSQE = io_uring_get_sqe(&ring);
-    io_uring_prep_read(readSQE, clientConn->fd, clientConn->buffer, MAX_BUFFER_SIZE, 0);
-    io_uring_sqe_set_data(readSQE, clientConn);
+    struct io_uring_sqe *recvSQE = io_uring_get_sqe(&ring);
+    io_uring_prep_recv(recvSQE, clientConn->fd, clientConn->buffer, MAX_BUFFER_SIZE, 0);
+    io_uring_sqe_set_data(recvSQE, clientConn);
     if (io_uring_submit(&ring) < 0) {
         perror("Failed to submit READ_REQUEST as SQE\n");
     }
 }
 
-void write_response(struct io_uring &ring, Connection *&conn, int &bytesRead) {
+void send_response(struct io_uring &ring, Connection *&conn, int &bytesRead) {
     conn->type = OpType::WRITE_RESPONSE;
-    struct io_uring_sqe *writeSQE = io_uring_get_sqe(&ring);
-    io_uring_prep_write(writeSQE, conn->fd, conn->buffer, bytesRead, 0);
-    io_uring_sqe_set_data(writeSQE, conn);
+    struct io_uring_sqe *sendSQE = io_uring_get_sqe(&ring);
+    io_uring_prep_send(sendSQE, conn->fd, conn->buffer, bytesRead, 0);
+    io_uring_sqe_set_data(sendSQE, conn);
     if (io_uring_submit(&ring) < 0) {
         perror("Failed to submit WRITE_RESPONSE as SQE\n");
     }
