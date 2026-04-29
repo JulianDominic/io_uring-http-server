@@ -1,4 +1,4 @@
-CC = g++
+CC = clang++-20
 CFLAGS = -Wall
 
 compile: build/server build/client
