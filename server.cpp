@@ -1,14 +1,23 @@
 #include <asm-generic/socket.h>
 #include <cstdio>
+#include <cstring>
+#include <iostream>
 #include <netinet/in.h>
+#include <ostream>
 #include <string_view>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <vector>
+#include <array>
 
 #define DEFAULT_PORT 8080
 #define RECV_BUFFER_SIZE 1024
 #define MAX_CONNECTIONS 10
+#define CRLF "\r\n"
+
+void parse_request_line(std::string_view buffer);
+std::vector<std::string_view> split(std::string_view str, const char *delim);
 
 int main(int argc, char *argv[]) {
     // create the socket
@@ -80,10 +89,10 @@ int main(int argc, char *argv[]) {
     }
 
     // receive request from client
-    char request_buffer[RECV_BUFFER_SIZE] = {0};
+    std::array<char, RECV_BUFFER_SIZE> request_buffer{};
     int bytes_recv = recv(
         client_fd,
-        request_buffer,
+        request_buffer.data(), // gives a pointer to the actual characters
         RECV_BUFFER_SIZE,
         0 // flags
     );
@@ -92,6 +101,15 @@ int main(int argc, char *argv[]) {
         perror("failed to receive bytes");
         return 1;
     }
+
+    // parse the request
+    /**
+    request-line<CRLF>
+    headers<CRLF>
+    <CRLF>
+    message-body
+     */
+    parse_request_line(std::string_view(request_buffer.data(), bytes_recv));
 
     // send string to client
     std::string_view response = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, world!";
@@ -111,4 +129,27 @@ int main(int argc, char *argv[]) {
     close(client_fd);
     close(socket_fd);
     return 0;
+}
+void parse_request_line(std::string_view buffer) {
+    size_t crlf_idx = buffer.find(CRLF, 0);
+    std::string_view request_line = buffer.substr(0, crlf_idx);
+    std::vector<std::string_view> components = split(request_line, " ");
+    // method       = components[0];
+    // request_uri  = components[1];
+    // http_version = components[2];
+}
+
+std::vector<std::string_view> split(std::string_view str, const char *delim) {
+    size_t start_pos = 0;
+    std::vector<std::string_view> result;
+    while (true) {
+        size_t curr_pos = str.find(delim, start_pos);
+        if (curr_pos == std::string_view::npos) {
+            result.push_back(str.substr(start_pos, curr_pos - start_pos));    
+            break;
+        }
+        result.push_back(str.substr(start_pos, curr_pos - start_pos));
+        start_pos = curr_pos + 1;
+    }
+    return result;
 }
