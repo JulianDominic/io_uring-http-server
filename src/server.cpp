@@ -1,5 +1,6 @@
 #include "server.hpp"
 #include "request.hpp"
+#include "response.hpp"
 #include <array>
 #include <cstring>
 #include <iostream>
@@ -109,11 +110,15 @@ void Server::start() {
         std::cout << request << std::endl;
 
         // send string to client
-        std::string response = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, world!";
+        Response response;
+        response.build(request);
+        response.prepare();
+        std::cout << "===RESPONSE===" << std::endl;
+        std::cout << response.response_str << std::endl;
         int bytes_sent = send(
             client_fd,
-            response.data(), // gives a pointer to the actual characters
-            response.size(),
+            response.response_str.data(), // gives a pointer to the actual characters
+            response.response_str.size(),
             0
         );
         if (bytes_sent == -1) {
