@@ -2,7 +2,7 @@
 #include <cstdio>
 #include <cstring>
 #include <netinet/in.h>
-#include <string_view>
+#include <string>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
@@ -16,10 +16,10 @@
 #define CRLF "\r\n"
 #define HEADER_DELIM ": "
 
-void parse_request_line(std::string_view);
-void parse_headers(std::string_view);
-void parse_body(std::string_view);
-std::vector<std::string_view> split(std::string_view, const char *);
+void parse_request_line(std::string);
+void parse_headers(std::string);
+void parse_body(std::string);
+std::vector<std::string> split(std::string, const char *);
 
 int main(int argc, char *argv[]) {
     // create the socket
@@ -111,18 +111,18 @@ int main(int argc, char *argv[]) {
     <CRLF>
     message-body
      */
-    std::string_view raw_request(request_buffer.data(), bytes_recv);
+    std::string raw_request(request_buffer.data(), bytes_recv);
     
     size_t start_pos = 0;
 
     // parse request_line
     size_t rl_crlf_idx = raw_request.find(CRLF, start_pos);
-    if (rl_crlf_idx == std::string_view::npos) {
+    if (rl_crlf_idx == std::string::npos) {
         // incomplete or malformed request
         perror("unable to parse request-line due to incomplete or malformed request");
         return 1;
     }
-    std::string_view raw_request_line = raw_request.substr(start_pos, rl_crlf_idx);
+    std::string raw_request_line = raw_request.substr(start_pos, rl_crlf_idx);
     parse_request_line(raw_request_line);
 
     // parse headers
@@ -131,21 +131,21 @@ int main(int argc, char *argv[]) {
     // get the end of the headers
     // adjacent string literals are concatenated by the compiler at compile time
     size_t hdrs_end_idx = raw_request.find(CRLF CRLF, start_pos);
-    if (hdrs_end_idx == std::string_view::npos) {
+    if (hdrs_end_idx == std::string::npos) {
         // incomplete or malformed request
         perror("unable to parse headers due to incomplete or malformed request");
         return 1;
     }
-    std::string_view raw_request_headers = raw_request.substr(start_pos, hdrs_end_idx - start_pos);
+    std::string raw_request_headers = raw_request.substr(start_pos, hdrs_end_idx - start_pos);
     parse_headers(raw_request_headers);
 
     // parse body
     start_pos = hdrs_end_idx + strlen(CRLF CRLF);
-    std::string_view raw_request_body = raw_request.substr(start_pos);
+    std::string raw_request_body = raw_request.substr(start_pos);
     parse_body(raw_request_body);
 
     // send string to client
-    std::string_view response = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, world!";
+    std::string response = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, world!";
     int bytes_sent = send(
         client_fd,
         response.data(), // gives a pointer to the actual characters
@@ -165,20 +165,20 @@ int main(int argc, char *argv[]) {
 }
 
 
-void parse_request_line(std::string_view raw_request_line) {
-    std::vector<std::string_view> components = split(raw_request_line, " ");
+void parse_request_line(std::string raw_request_line) {
+    std::vector<std::string> components = split(raw_request_line, " ");
     // method       = components[0];
     // request_uri  = components[1];
     // http_version = components[2];
 }
 
 
-void parse_headers(std::string_view raw_request_headers) {
-    std::vector<std::string_view> headers = split(raw_request_headers, CRLF);
+void parse_headers(std::string raw_request_headers) {
+    std::vector<std::string> headers = split(raw_request_headers, CRLF);
 
-    std::unordered_map<std::string_view, std::string_view> header_map;
+    std::unordered_map<std::string, std::string> header_map;
 
-    for (std::string_view raw_header : headers) {
+    for (std::string raw_header : headers) {
         size_t delim_idx = raw_header.find(HEADER_DELIM, 0);
         header_map.emplace(
             raw_header.substr(0, delim_idx),
@@ -188,17 +188,17 @@ void parse_headers(std::string_view raw_request_headers) {
 }
 
 
-void parse_body(std::string_view raw_request_body) {
+void parse_body(std::string raw_request_body) {
     // temp parse body
 }
 
 
-std::vector<std::string_view> split(std::string_view str, const char *delim) {
+std::vector<std::string> split(std::string str, const char *delim) {
     size_t start_pos = 0;
-    std::vector<std::string_view> result;
+    std::vector<std::string> result;
     while (true) {
         size_t curr_pos = str.find(delim, start_pos);
-        if (curr_pos == std::string_view::npos) {
+        if (curr_pos == std::string::npos) {
             result.push_back(str.substr(start_pos));    
             break;
         }
