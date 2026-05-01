@@ -1,6 +1,7 @@
 #include <cctype>
 #include <cstdio>
 #include <cstring>
+#include <iostream>
 #include <netinet/in.h>
 #include <string>
 #include <sys/socket.h>
@@ -16,9 +17,18 @@
 #define CRLF "\r\n"
 #define HEADER_DELIM ": "
 
-void parse_request_line(std::string);
-void parse_headers(std::string);
-void parse_body(std::string);
+
+typedef struct {
+    std::string method;
+    std::string uri;
+    std::string version;
+    std::unordered_map<std::string, std::string> headers;
+    std::string body;
+} Request;
+
+void parse_request_line(std::string, Request *);
+void parse_headers(std::string, Request *);
+void parse_body(std::string, Request *);
 std::vector<std::string> split(std::string, const char *);
 
 int main(int argc, char *argv[]) {
@@ -111,6 +121,7 @@ int main(int argc, char *argv[]) {
     <CRLF>
     message-body
      */
+    Request request;
     std::string raw_request(request_buffer.data(), bytes_recv);
     
     size_t start_pos = 0;
@@ -123,7 +134,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     std::string raw_request_line = raw_request.substr(start_pos, rl_crlf_idx);
-    parse_request_line(raw_request_line);
+    parse_request_line(raw_request_line, &request);
 
     // parse headers
     // offset starting position to not include request_line
@@ -137,12 +148,23 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     std::string raw_request_headers = raw_request.substr(start_pos, hdrs_end_idx - start_pos);
-    parse_headers(raw_request_headers);
+    parse_headers(raw_request_headers, &request);
 
     // parse body
     start_pos = hdrs_end_idx + strlen(CRLF CRLF);
     std::string raw_request_body = raw_request.substr(start_pos);
-    parse_body(raw_request_body);
+    parse_body(raw_request_body, &request);
+
+    // print request
+    std::cout << "METHOD: " << request.method << std::endl;
+    std::cout << "URI: " << request.uri << std::endl;
+    std::cout << "VERSION: " << request.version << std::endl;
+    std::cout << "===HEADERS===" << std::endl;
+    for (auto [key, value] : request.headers) {
+        std::cout << key << ": " << value << std::endl;
+    }
+    std::cout << "=============" << std::endl;
+    std::cout << "BODY:\n" << request.body << std::endl;
 
     // send string to client
     std::string response = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, world!";
@@ -165,15 +187,15 @@ int main(int argc, char *argv[]) {
 }
 
 
-void parse_request_line(std::string raw_request_line) {
+void parse_request_line(std::string raw_request_line, Request *request) {
     std::vector<std::string> components = split(raw_request_line, " ");
-    // method       = components[0];
-    // request_uri  = components[1];
-    // http_version = components[2];
+    request->method  = components[0];
+    request->uri     = components[1];
+    request->version = components[2];
 }
 
 
-void parse_headers(std::string raw_request_headers) {
+void parse_headers(std::string raw_request_headers, Request *request) {
     std::vector<std::string> headers = split(raw_request_headers, CRLF);
 
     std::unordered_map<std::string, std::string> header_map;
@@ -185,11 +207,13 @@ void parse_headers(std::string raw_request_headers) {
             raw_header.substr(delim_idx + strlen(HEADER_DELIM))
         );
     }
+    request->headers = header_map;
 }
 
 
-void parse_body(std::string raw_request_body) {
+void parse_body(std::string raw_request_body, Request *request) {
     // temp parse body
+    request->body = raw_request_body;
 }
 
 
