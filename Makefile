@@ -1,10 +1,10 @@
 CC = clang++-20
 CFLAGS = -Wall
 
-compile: build/server
+compile: build/main
 
-build/server: server.cpp | build
-	$(CC) $(CFLAGS) server.cpp -o build/server -luring
+build/main: src/main.cpp src/server.cpp src/request.cpp src/utils.hpp | build
+	$(CC) $(CFLAGS) src/main.cpp -o build/main -luring
 
 build:
 	mkdir -p build
