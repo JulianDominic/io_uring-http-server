@@ -1,5 +1,6 @@
 CC = clang++-20
-CFLAGS = -Wall -std=c++26
+# -MMD and -MP help me track dependencies for changes in .hpp
+CFLAGS = -Wall -std=c++26 -MMD -MP
 LDLIBS = -luring
 
 SRC_DIR = src
@@ -21,3 +22,8 @@ $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
 
 $(BUILD_DIR):
 	mkdir -p $@
+
+clean:
+	rm -r $(BUILD_DIR)
+
+-include $(DEPS)
