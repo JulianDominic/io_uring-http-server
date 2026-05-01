@@ -42,13 +42,21 @@ void Request::parse_request(std::string raw_request) {
 
 void Request::parse_request_line(std::string raw_request_line) {
     std::vector<std::string> components = split(raw_request_line, " ");
+    if (components.size() != 3) {
+        throw std::runtime_error("malformed request-line");
+    }
+    
+    // check if method is supported
+    if (!method_str_to_enum.contains(components[0])) {
+        throw std::runtime_error("http method is not supported or invalid");
+    }
 
     // check version
     if (components[2] != "HTTP/1.1") {
         throw std::runtime_error("wrong http version received");
     }
 
-    this->method  = components[0];
+    this->method  = method_str_to_enum[components[0]];
     this->uri     = components[1];
     this->version = components[2];
 }

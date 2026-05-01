@@ -2,13 +2,14 @@
 #include <iostream>
 #include <string>
 #include <unordered_map>
+#include "http_method.hpp"
 
 #define CRLF "\r\n"
 #define HEADER_DELIM ": "
 
 class Request {
 public:
-    std::string method;
+    HTTPMethod method;
     std::string uri;
     std::string version;
     std::unordered_map<std::string, std::string> headers;
