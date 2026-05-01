@@ -1,5 +1,5 @@
 CC = clang++-20
-CFLAGS = -Wall
+CFLAGS = -Wall -std=c++26
 LDLIBS = -luring
 
 SRC_DIR = src
@@ -14,10 +14,10 @@ TARGET = $(BUILD_DIR)/main
 compile: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDLIBS)
+	$(CC) $(CFLAGS) $^ -o $@ $(LDLIBS)
 
 $(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) -c $< -o $@
 
 $(BUILD_DIR):
 	mkdir -p $@
