@@ -1,5 +1,6 @@
 #include "request.hpp"
 #include <cstring>
+#include <stdexcept>
 #include "utils.hpp"
 
 void Request::parse_request(std::string raw_request) {
@@ -41,6 +42,12 @@ void Request::parse_request(std::string raw_request) {
 
 void Request::parse_request_line(std::string raw_request_line) {
     std::vector<std::string> components = split(raw_request_line, " ");
+
+    // check version
+    if (components[2] != "HTTP/1.1") {
+        throw std::runtime_error("wrong http version received");
+    }
+
     this->method  = components[0];
     this->uri     = components[1];
     this->version = components[2];
