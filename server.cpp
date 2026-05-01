@@ -18,6 +18,7 @@
 
 void parse_request_line(std::string_view);
 void parse_headers(std::string_view);
+void parse_body(std::string_view);
 std::vector<std::string_view> split(std::string_view, const char *);
 
 int main(int argc, char *argv[]) {
@@ -138,9 +139,10 @@ int main(int argc, char *argv[]) {
     std::string_view raw_request_headers = raw_request.substr(start_pos, hdrs_end_idx - start_pos);
     parse_headers(raw_request_headers);
 
-    // 
+    // parse body
     start_pos = hdrs_end_idx + strlen(CRLF CRLF);
-
+    std::string_view raw_request_body = raw_request.substr(start_pos);
+    parse_body(raw_request_body);
 
     // send string to client
     std::string_view response = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, world!";
@@ -186,13 +188,18 @@ void parse_headers(std::string_view raw_request_headers) {
 }
 
 
+void parse_body(std::string_view raw_request_body) {
+    // temp parse body
+}
+
+
 std::vector<std::string_view> split(std::string_view str, const char *delim) {
     size_t start_pos = 0;
     std::vector<std::string_view> result;
     while (true) {
         size_t curr_pos = str.find(delim, start_pos);
         if (curr_pos == std::string_view::npos) {
-            result.push_back(str.substr(start_pos, curr_pos - start_pos));    
+            result.push_back(str.substr(start_pos));    
             break;
         }
         result.push_back(str.substr(start_pos, curr_pos - start_pos));
