@@ -1,13 +1,12 @@
-#include <asm-generic/socket.h>
+#include <cctype>
 #include <cstdio>
 #include <cstring>
-#include <iostream>
 #include <netinet/in.h>
-#include <ostream>
 #include <string_view>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <unordered_map>
 #include <vector>
 #include <array>
 
@@ -15,9 +14,11 @@
 #define RECV_BUFFER_SIZE 1024
 #define MAX_CONNECTIONS 10
 #define CRLF "\r\n"
+#define HEADER_DELIM ": "
 
-void parse_request_line(std::string_view buffer);
-std::vector<std::string_view> split(std::string_view str, const char *delim);
+void parse_request_line(std::string_view);
+void parse_headers(std::string_view);
+std::vector<std::string_view> split(std::string_view, const char *);
 
 int main(int argc, char *argv[]) {
     // create the socket
@@ -109,7 +110,37 @@ int main(int argc, char *argv[]) {
     <CRLF>
     message-body
      */
-    parse_request_line(std::string_view(request_buffer.data(), bytes_recv));
+    std::string_view raw_request(request_buffer.data(), bytes_recv);
+    
+    size_t start_pos = 0;
+
+    // parse request_line
+    size_t rl_crlf_idx = raw_request.find(CRLF, start_pos);
+    if (rl_crlf_idx == std::string_view::npos) {
+        // incomplete or malformed request
+        perror("unable to parse request-line due to incomplete or malformed request");
+        return 1;
+    }
+    std::string_view raw_request_line = raw_request.substr(start_pos, rl_crlf_idx);
+    parse_request_line(raw_request_line);
+
+    // parse headers
+    // offset starting position to not include request_line
+    start_pos = rl_crlf_idx + strlen(CRLF);
+    // get the end of the headers
+    // adjacent string literals are concatenated by the compiler at compile time
+    size_t hdrs_end_idx = raw_request.find(CRLF CRLF, start_pos);
+    if (hdrs_end_idx == std::string_view::npos) {
+        // incomplete or malformed request
+        perror("unable to parse headers due to incomplete or malformed request");
+        return 1;
+    }
+    std::string_view raw_request_headers = raw_request.substr(start_pos, hdrs_end_idx - start_pos);
+    parse_headers(raw_request_headers);
+
+    // 
+    start_pos = hdrs_end_idx + strlen(CRLF CRLF);
+
 
     // send string to client
     std::string_view response = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, world!";
@@ -130,14 +161,30 @@ int main(int argc, char *argv[]) {
     close(socket_fd);
     return 0;
 }
-void parse_request_line(std::string_view buffer) {
-    size_t crlf_idx = buffer.find(CRLF, 0);
-    std::string_view request_line = buffer.substr(0, crlf_idx);
-    std::vector<std::string_view> components = split(request_line, " ");
+
+
+void parse_request_line(std::string_view raw_request_line) {
+    std::vector<std::string_view> components = split(raw_request_line, " ");
     // method       = components[0];
     // request_uri  = components[1];
     // http_version = components[2];
 }
+
+
+void parse_headers(std::string_view raw_request_headers) {
+    std::vector<std::string_view> headers = split(raw_request_headers, CRLF);
+
+    std::unordered_map<std::string_view, std::string_view> header_map;
+
+    for (std::string_view raw_header : headers) {
+        size_t delim_idx = raw_header.find(HEADER_DELIM, 0);
+        header_map.emplace(
+            raw_header.substr(0, delim_idx),
+            raw_header.substr(delim_idx + strlen(HEADER_DELIM))
+        );
+    }
+}
+
 
 std::vector<std::string_view> split(std::string_view str, const char *delim) {
     size_t start_pos = 0;
