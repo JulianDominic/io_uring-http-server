@@ -73,6 +73,10 @@ Server::Server(int port) {
     setup_socket();
 }
 
+Server::~Server() {
+    close(this->socket_fd);
+}
+
 void Server::start() {
     std::cout << "Server is now ready at " << "http://0.0.0.0:" << this->port << std::endl;
     while (true) {
