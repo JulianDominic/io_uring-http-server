@@ -27,6 +27,9 @@ void Response::build_status_line(std::string uri) {
 void Response::build_headers() {
     // TODO: handle other types
     std::string content_type = "text/html";
+    if (this->path.ends_with(".ico")) {
+        content_type = "image/x-icon";
+    }
 
     // content-type header
     this->headers.emplace("Content-Type", content_type);
