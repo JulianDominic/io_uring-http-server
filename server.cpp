@@ -40,9 +40,9 @@ std::ostream& operator<<(std::ostream& os, const Request& request) {
     return os;
 }
 
-void parse_request_line(std::string, Request *);
-void parse_headers(std::string, Request *);
-void parse_body(std::string, Request *);
+void parse_request_line(std::string, Request&);
+void parse_headers(std::string, Request&);
+void parse_body(std::string, Request&);
 std::vector<std::string> split(std::string, const char *);
 
 int main(int argc, char *argv[]) {
@@ -148,7 +148,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     std::string raw_request_line = raw_request.substr(start_pos, rl_crlf_idx);
-    parse_request_line(raw_request_line, &request);
+    parse_request_line(raw_request_line, request);
 
     // parse headers
     // offset starting position to not include request_line
@@ -162,12 +162,12 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     std::string raw_request_headers = raw_request.substr(start_pos, hdrs_end_idx - start_pos);
-    parse_headers(raw_request_headers, &request);
+    parse_headers(raw_request_headers, request);
 
     // parse body
     start_pos = hdrs_end_idx + strlen(CRLF CRLF);
     std::string raw_request_body = raw_request.substr(start_pos);
-    parse_body(raw_request_body, &request);
+    parse_body(raw_request_body, request);
 
     // print request
     std::cout << request << std::endl;
@@ -193,15 +193,15 @@ int main(int argc, char *argv[]) {
 }
 
 
-void parse_request_line(std::string raw_request_line, Request *request) {
+void parse_request_line(std::string raw_request_line, Request& request) {
     std::vector<std::string> components = split(raw_request_line, " ");
-    request->method  = components[0];
-    request->uri     = components[1];
-    request->version = components[2];
+    request.method  = components[0];
+    request.uri     = components[1];
+    request.version = components[2];
 }
 
 
-void parse_headers(std::string raw_request_headers, Request *request) {
+void parse_headers(std::string raw_request_headers, Request& request) {
     std::vector<std::string> headers = split(raw_request_headers, CRLF);
 
     std::unordered_map<std::string, std::string> header_map;
@@ -213,13 +213,13 @@ void parse_headers(std::string raw_request_headers, Request *request) {
             raw_header.substr(delim_idx + strlen(HEADER_DELIM))
         );
     }
-    request->headers = header_map;
+    request.headers = header_map;
 }
 
 
-void parse_body(std::string raw_request_body, Request *request) {
+void parse_body(std::string raw_request_body, Request& request) {
     // temp parse body
-    request->body = raw_request_body;
+    request.body = raw_request_body;
 }
 
 
