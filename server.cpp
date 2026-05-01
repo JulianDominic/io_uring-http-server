@@ -149,7 +149,7 @@ std::vector<std::string_view> split(std::string_view str, const char *delim) {
             break;
         }
         result.push_back(str.substr(start_pos, curr_pos - start_pos));
-        start_pos = curr_pos + 1;
+        start_pos = curr_pos + strlen(delim);
     }
     return result;
 }
