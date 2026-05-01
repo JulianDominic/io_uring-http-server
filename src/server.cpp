@@ -107,14 +107,15 @@ void Server::start() {
         request.parse_request(raw_request);
 
         // print request
-        std::cout << request << std::endl;
+        // std::cout << request << std::endl;
+        std::cout << "fd=" << client_fd << " RECV: " << request.method << " " << request.uri << std::endl;
 
         // send string to client
         Response response;
         response.build(request);
         response.prepare();
-        std::cout << "===RESPONSE===" << std::endl;
-        std::cout << response.response_str << std::endl;
+        // std::cout << "===RESPONSE===" << std::endl;
+        // std::cout << response.response_str << std::endl;
         int bytes_sent = send(
             client_fd,
             response.response_str.data(), // gives a pointer to the actual characters
@@ -125,6 +126,7 @@ void Server::start() {
             // failed to send
             throw std::runtime_error("failed to send bytes");
         }
+        std::cout << "fd=" << client_fd << " SEND: " << response.status_line << std::endl;
 
         // close the socket
         close(client_fd);
