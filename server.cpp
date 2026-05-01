@@ -26,6 +26,20 @@ typedef struct {
     std::string body;
 } Request;
 
+// this function lets me print Request structs with just std::cout << request << std::endl;
+std::ostream& operator<<(std::ostream& os, const Request& request) {
+    os << "METHOD: " << request.method << "\n";
+    os << "URI: " << request.uri << "\n";
+    os << "VERSION: " << request.version << "\n";
+    os << "===HEADERS===" << "\n";
+    for (auto [key, value] : request.headers) {
+        os << key << ": " << value << "\n";
+    }
+    os << "=============" << "\n";
+    os << "BODY:\n" << request.body;
+    return os;
+}
+
 void parse_request_line(std::string, Request *);
 void parse_headers(std::string, Request *);
 void parse_body(std::string, Request *);
@@ -156,15 +170,7 @@ int main(int argc, char *argv[]) {
     parse_body(raw_request_body, &request);
 
     // print request
-    std::cout << "METHOD: " << request.method << std::endl;
-    std::cout << "URI: " << request.uri << std::endl;
-    std::cout << "VERSION: " << request.version << std::endl;
-    std::cout << "===HEADERS===" << std::endl;
-    for (auto [key, value] : request.headers) {
-        std::cout << key << ": " << value << std::endl;
-    }
-    std::cout << "=============" << std::endl;
-    std::cout << "BODY:\n" << request.body << std::endl;
+    std::cout << request << std::endl;
 
     // send string to client
     std::string response = "HTTP/1.1 200 OK\r\nContent-Length: 13\r\n\r\nHello, world!";
