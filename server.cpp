@@ -40,6 +40,7 @@ std::ostream& operator<<(std::ostream& os, const Request& request) {
     return os;
 }
 
+int parse_request(std::string, Request&);
 void parse_request_line(std::string, Request&);
 void parse_headers(std::string, Request&);
 void parse_body(std::string, Request&);
@@ -129,45 +130,13 @@ int main(int argc, char *argv[]) {
     }
 
     // parse the request
-    /**
-    request-line<CRLF>
-    headers<CRLF>
-    <CRLF>
-    message-body
-     */
     Request request;
     std::string raw_request(request_buffer.data(), bytes_recv);
     
-    size_t start_pos = 0;
-
-    // parse request_line
-    size_t rl_crlf_idx = raw_request.find(CRLF, start_pos);
-    if (rl_crlf_idx == std::string::npos) {
-        // incomplete or malformed request
-        perror("unable to parse request-line due to incomplete or malformed request");
+    int parse_req_ret = parse_request(raw_request, request);
+    if (parse_req_ret == -1) {
         return 1;
     }
-    std::string raw_request_line = raw_request.substr(start_pos, rl_crlf_idx);
-    parse_request_line(raw_request_line, request);
-
-    // parse headers
-    // offset starting position to not include request_line
-    start_pos = rl_crlf_idx + strlen(CRLF);
-    // get the end of the headers
-    // adjacent string literals are concatenated by the compiler at compile time
-    size_t hdrs_end_idx = raw_request.find(CRLF CRLF, start_pos);
-    if (hdrs_end_idx == std::string::npos) {
-        // incomplete or malformed request
-        perror("unable to parse headers due to incomplete or malformed request");
-        return 1;
-    }
-    std::string raw_request_headers = raw_request.substr(start_pos, hdrs_end_idx - start_pos);
-    parse_headers(raw_request_headers, request);
-
-    // parse body
-    start_pos = hdrs_end_idx + strlen(CRLF CRLF);
-    std::string raw_request_body = raw_request.substr(start_pos);
-    parse_body(raw_request_body, request);
 
     // print request
     std::cout << request << std::endl;
@@ -189,6 +158,47 @@ int main(int argc, char *argv[]) {
     // close the sockets
     close(client_fd);
     close(socket_fd);
+    return 0;
+}
+
+
+int parse_request(std::string raw_request, Request& request) {
+    /**
+    request-line<CRLF>
+    headers<CRLF>
+    <CRLF>
+    message-body
+     */
+    size_t start_pos = 0;
+
+    // parse request_line
+    size_t rl_crlf_idx = raw_request.find(CRLF, start_pos);
+    if (rl_crlf_idx == std::string::npos) {
+        // incomplete or malformed request
+        perror("unable to parse request-line due to incomplete or malformed request");
+        return -1;
+    }
+    std::string raw_request_line = raw_request.substr(start_pos, rl_crlf_idx);
+    parse_request_line(raw_request_line, request);
+
+    // parse headers
+    // offset starting position to not include request_line
+    start_pos = rl_crlf_idx + strlen(CRLF);
+    // get the end of the headers
+    // adjacent string literals are concatenated by the compiler at compile time
+    size_t hdrs_end_idx = raw_request.find(CRLF CRLF, start_pos);
+    if (hdrs_end_idx == std::string::npos) {
+        // incomplete or malformed request
+        perror("unable to parse headers due to incomplete or malformed request");
+        return -1;
+    }
+    std::string raw_request_headers = raw_request.substr(start_pos, hdrs_end_idx - start_pos);
+    parse_headers(raw_request_headers, request);
+
+    // parse body
+    start_pos = hdrs_end_idx + strlen(CRLF CRLF);
+    std::string raw_request_body = raw_request.substr(start_pos);
+    parse_body(raw_request_body, request);
     return 0;
 }
 
