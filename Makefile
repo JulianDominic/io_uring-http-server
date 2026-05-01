@@ -1,10 +1,23 @@
 CC = clang++-20
 CFLAGS = -Wall
+LDLIBS = -luring
 
-compile: build/main
+SRC_DIR = src
+BUILD_DIR = build
 
-build/main: src/main.cpp src/server.cpp src/request.cpp src/utils.hpp | build
-	$(CC) $(CFLAGS) src/main.cpp -o build/main -luring
+SRCS = $(wildcard $(SRC_DIR)/*.cpp)
+OBJS = $(SRCS:$(SRC_DIR)/%.cpp=$(BUILD_DIR)/%.o)
+DEPS = $(OBJS:.o=.d)
 
-build:
-	mkdir -p build
+TARGET = $(BUILD_DIR)/main
+
+compile: $(TARGET)
+
+$(TARGET): $(OBJS)
+	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDLIBS)
+
+$(BUILD_DIR)/%.o: $(SRC_DIR)/%.cpp | $(BUILD_DIR)
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(BUILD_DIR):
+	mkdir -p $@
