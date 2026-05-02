@@ -131,61 +131,6 @@ void Server::start() {
         }
 
         io_uring_cqe_seen(&this->ring, this->cqe);
-
-        // accept connection from client
-        // int client_fd = accept(
-        //     this->socket_fd,
-        //     0, // for additional client information
-        //     0 // for additional client information
-        // );
-        // if (client_fd == -1) {
-        //     // failed to accept connection
-        //     throw std::runtime_error("failed to accept connection");
-        // }
-
-        // receive request from client
-        // std::array<char, RECV_BUFFER_SIZE> request_buffer{};
-        // int bytes_recv = recv(
-        //     client_fd,
-        //     request_buffer.data(), // gives a pointer to the actual characters
-        //     RECV_BUFFER_SIZE,
-        //     0 // flags
-        // );
-        // if (bytes_recv == -1) {
-        //     // failed to receive bytes
-        //     throw std::runtime_error("failed to receive bytes");
-        // }
-
-        // // parse the request
-        // Request request;
-        // std::string raw_request(request_buffer.data(), bytes_recv);
-        
-        // request.parse_request(raw_request);
-
-        // // print request
-        // // std::cout << request << std::endl;
-        // std::cout << "fd=" << client_fd << " RECV: " << request.method << " " << request.uri << std::endl;
-
-        // // send string to client
-        // Response response;
-        // response.build(request);
-        // response.prepare();
-        // // std::cout << "===RESPONSE===" << std::endl;
-        // // std::cout << response.response_str << std::endl;
-        // int bytes_sent = send(
-        //     client_fd,
-        //     response.response_str.data(), // gives a pointer to the actual characters
-        //     response.response_str.size(),
-        //     0
-        // );
-        // if (bytes_sent == -1) {
-        //     // failed to send
-        //     throw std::runtime_error("failed to send bytes");
-        // }
-        // std::cout << "fd=" << client_fd << " SEND: " << response.status_line << std::endl;
-
-        // // close the socket
-        // close(client_fd);
     }
 }
 
