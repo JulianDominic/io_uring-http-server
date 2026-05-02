@@ -87,7 +87,7 @@ Server::~Server() {
 }
 
 void Server::start() {
-    std::cout << "Server is now ready at " << "http://0.0.0.0:" << this->port << std::endl;
+    std::cout << "Server (fd=" << this->socket_fd << ")" << " is now ready at " << "http://0.0.0.0:" << this->port << std::endl;
 
     // create the first accept request
     add_accept_request();
