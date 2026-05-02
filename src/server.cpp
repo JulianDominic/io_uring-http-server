@@ -109,6 +109,7 @@ void Server::start() {
             // ERROR occured
             add_close_request(conn);
             io_uring_submit(&this->ring);
+            continue;
         }
 
         switch (conn->optype) {
