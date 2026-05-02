@@ -1,9 +1,10 @@
 #include "server.hpp"
 #include "request.hpp"
-#include "response.hpp"
 #include <array>
 #include <cstring>
 #include <iostream>
+#include <liburing.h>
+#include <liburing/io_uring.h>
 #include <netinet/in.h>
 #include <stdexcept>
 #include <sys/socket.h>
@@ -63,76 +64,197 @@ void Server::setup_socket() {
     }
 }
 
-Server::Server() {
-    this->port = DEFAULT_PORT;
-    setup_socket();
+void Server::setup_io_uring() {
+    // create the ring
+    int queue_init_ret = io_uring_queue_init(QUEUE_DEPTH, &ring, 0);
+    if (queue_init_ret == -1) {
+        throw std::runtime_error("failed to init io_uring queue");
+    }
 }
+
+// delegate construction to Server(int port)
+Server::Server() : Server(DEFAULT_PORT) {}
 
 Server::Server(int port) {
     this->port = port;
     setup_socket();
+    setup_io_uring();
 }
 
 Server::~Server() {
     close(this->socket_fd);
+    io_uring_queue_exit(&this->ring);
 }
 
 void Server::start() {
     std::cout << "Server is now ready at " << "http://0.0.0.0:" << this->port << std::endl;
+
+    // create the first accept request
+    add_accept_request();
+    // submit sqe to the ring
+    io_uring_submit(&this->ring);
+
     while (true) {
-        // accept connection from client
-        int client_fd = accept(
-            this->socket_fd,
-            0, // for additional client information
-            0 // for additional client information
+        int wait_cqe_ret = io_uring_wait_cqe(
+            &this->ring,
+            &this->cqe
         );
-        if (client_fd == -1) {
-            // failed to accept connection
-            throw std::runtime_error("failed to accept connection");
+        if (wait_cqe_ret < 0) {
+            throw std::runtime_error("failed to wait cqe");
         }
+
+        // AT THIS POINT, WAIT FINISHED, CQE RECEIVED
+        Connection *conn = (Connection *) io_uring_cqe_get_data(cqe);
+        if (cqe->res < 0) {
+            // ERROR occured
+            add_close_request(conn);
+            io_uring_submit(&this->ring);
+        }
+
+        switch (conn->optype) {
+            case OpType::ACCEPT_CONNECTION:
+                add_accept_request();
+                add_recv_request(conn, cqe->res);
+                io_uring_submit(&this->ring);
+                break;
+            case OpType::RECV_REQUEST:
+                add_send_request(conn, cqe->res);
+                io_uring_submit(&this->ring);
+                break;
+            case OpType::SEND_RESPONSE:
+                add_close_request(conn, cqe->res);
+                io_uring_submit(&this->ring);
+                break;
+            case OpType::CLOSE_CONNECTION:
+                delete conn;
+                break;
+        }
+
+        io_uring_cqe_seen(&this->ring, this->cqe);
+
+        // accept connection from client
+        // int client_fd = accept(
+        //     this->socket_fd,
+        //     0, // for additional client information
+        //     0 // for additional client information
+        // );
+        // if (client_fd == -1) {
+        //     // failed to accept connection
+        //     throw std::runtime_error("failed to accept connection");
+        // }
 
         // receive request from client
-        std::array<char, RECV_BUFFER_SIZE> request_buffer{};
-        int bytes_recv = recv(
-            client_fd,
-            request_buffer.data(), // gives a pointer to the actual characters
-            RECV_BUFFER_SIZE,
-            0 // flags
-        );
-        if (bytes_recv == -1) {
-            // failed to receive bytes
-            throw std::runtime_error("failed to receive bytes");
-        }
+        // std::array<char, RECV_BUFFER_SIZE> request_buffer{};
+        // int bytes_recv = recv(
+        //     client_fd,
+        //     request_buffer.data(), // gives a pointer to the actual characters
+        //     RECV_BUFFER_SIZE,
+        //     0 // flags
+        // );
+        // if (bytes_recv == -1) {
+        //     // failed to receive bytes
+        //     throw std::runtime_error("failed to receive bytes");
+        // }
 
-        // parse the request
-        Request request;
-        std::string raw_request(request_buffer.data(), bytes_recv);
+        // // parse the request
+        // Request request;
+        // std::string raw_request(request_buffer.data(), bytes_recv);
         
-        request.parse_request(raw_request);
+        // request.parse_request(raw_request);
 
-        // print request
-        // std::cout << request << std::endl;
-        std::cout << "fd=" << client_fd << " RECV: " << request.method << " " << request.uri << std::endl;
+        // // print request
+        // // std::cout << request << std::endl;
+        // std::cout << "fd=" << client_fd << " RECV: " << request.method << " " << request.uri << std::endl;
 
-        // send string to client
-        Response response;
-        response.build(request);
-        response.prepare();
-        // std::cout << "===RESPONSE===" << std::endl;
-        // std::cout << response.response_str << std::endl;
-        int bytes_sent = send(
-            client_fd,
-            response.response_str.data(), // gives a pointer to the actual characters
-            response.response_str.size(),
-            0
-        );
-        if (bytes_sent == -1) {
-            // failed to send
-            throw std::runtime_error("failed to send bytes");
-        }
-        std::cout << "fd=" << client_fd << " SEND: " << response.status_line << std::endl;
+        // // send string to client
+        // Response response;
+        // response.build(request);
+        // response.prepare();
+        // // std::cout << "===RESPONSE===" << std::endl;
+        // // std::cout << response.response_str << std::endl;
+        // int bytes_sent = send(
+        //     client_fd,
+        //     response.response_str.data(), // gives a pointer to the actual characters
+        //     response.response_str.size(),
+        //     0
+        // );
+        // if (bytes_sent == -1) {
+        //     // failed to send
+        //     throw std::runtime_error("failed to send bytes");
+        // }
+        // std::cout << "fd=" << client_fd << " SEND: " << response.status_line << std::endl;
 
-        // close the socket
-        close(client_fd);
+        // // close the socket
+        // close(client_fd);
     }
+}
+
+void Server::add_accept_request() {
+    this->sqe = io_uring_get_sqe(&ring);
+    io_uring_prep_accept(
+        sqe,
+        this->socket_fd,
+        nullptr,
+        nullptr,
+        0
+    );
+    io_uring_sqe_set_data(
+        this->sqe,
+        new Connection{ this->socket_fd, OpType::ACCEPT_CONNECTION }
+    );
+}
+
+void Server::add_recv_request(Connection *conn, int client_fd) {
+    conn->fd = client_fd;
+    conn->optype = OpType::RECV_REQUEST;
+
+    // issue the recv
+    struct io_uring_sqe *recv_sqe = io_uring_get_sqe(&this->ring);
+    io_uring_prep_recv(
+        recv_sqe,
+        conn->fd,
+        conn->request_buffer.data(),
+        RECV_BUFFER_SIZE,
+        0
+    );
+    io_uring_sqe_set_data(recv_sqe, conn);
+}
+
+void Server::add_send_request(Connection *conn, int bytes_recv) {
+    // parse the request
+    std::string raw_request(conn->request_buffer.data(), bytes_recv);
+    Request *request = new Request{};
+    request->parse_request(raw_request);
+    conn->request = request;
+    std::cout << "fd=" << conn->fd << " bytes_recv=" << bytes_recv << " RECV: " << request->method << " " << request->uri << std::endl;
+
+    // build the response
+    Response *response = new Response{};
+    response->build(*request);
+    response->prepare();
+    conn->response = response;
+
+    // issue the send
+    conn->optype = OpType::SEND_RESPONSE;
+    struct io_uring_sqe *send_sqe = io_uring_get_sqe(&this->ring);
+    io_uring_prep_send(
+        send_sqe,
+        conn->fd,
+        conn->response->response_str.data(),
+        conn->response->response_str.size(),
+        0
+    );
+    io_uring_sqe_set_data(send_sqe, conn);
+}
+
+void Server::add_close_request(Connection *conn) {
+    conn->optype = OpType::CLOSE_CONNECTION;
+    struct io_uring_sqe *close_sqe = io_uring_get_sqe(&this->ring);
+    io_uring_prep_close(close_sqe, conn->fd);
+    io_uring_sqe_set_data(close_sqe, conn);
+}
+
+void Server::add_close_request(Connection *conn, int bytes_sent) {
+    std::cout << "fd=" << conn->fd << " bytes_sent=" << bytes_sent << " SEND: " << conn->response->status_line << std::endl;
+    add_close_request(conn);
 }
