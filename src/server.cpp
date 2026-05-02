@@ -169,16 +169,14 @@ void Server::add_recv_request(Connection *conn, int client_fd) {
 void Server::add_send_request(Connection *conn, int bytes_recv) {
     // parse the request
     std::string raw_request(conn->request_buffer.data(), bytes_recv);
-    Request *request = new Request{};
-    request->parse_request(raw_request);
-    conn->request = request;
-    std::cout << "fd=" << conn->fd << " bytes_recv=" << bytes_recv << " RECV: " << request->method << " " << request->uri << std::endl;
+    conn->request = std::make_unique<Request>();
+    conn->request->parse_request(raw_request);
+    std::cout << "fd=" << conn->fd << " bytes_recv=" << bytes_recv << " RECV: " << conn->request->method << " " << conn->request->uri << std::endl;
 
     // build the response
-    Response *response = new Response{};
-    response->build(*request);
-    response->prepare();
-    conn->response = response;
+    conn->response = std::make_unique<Response>();
+    conn->response->build(*conn->request);
+    conn->response->prepare();
 
     // issue the send
     conn->optype = OpType::SEND_RESPONSE;

@@ -3,6 +3,7 @@
 #include "request.hpp"
 #include "response.hpp"
 #include <array>
+#include <memory>
 
 #define RECV_BUFFER_SIZE 1024
 #define DEFAULT_PORT 8080
@@ -22,8 +23,8 @@ public:
     Connection(int server_fd, OpType optype);
     int fd;
     OpType optype;
-    Request *request;
-    Response *response;
+    std::unique_ptr<Request> request;
+    std::unique_ptr<Response> response;
 };
 
 inline Connection::Connection(int server_fd, OpType optype) {
