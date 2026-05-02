@@ -16,7 +16,7 @@ void Request::parse_request(std::string raw_request) {
     size_t rl_crlf_idx = raw_request.find(CRLF, start_pos);
     if (rl_crlf_idx == std::string::npos) {
         // incomplete or malformed request
-        throw std::runtime_error("unable to parse request-line due to incomplete or malformed request");
+        throw std::runtime_error("unable to parse request-line due to incomplete or malformed request-line");
     }
     std::string raw_request_line = raw_request.substr(start_pos, rl_crlf_idx);
     parse_request_line(raw_request_line);
@@ -29,7 +29,7 @@ void Request::parse_request(std::string raw_request) {
     size_t hdrs_end_idx = raw_request.find(CRLF CRLF, start_pos);
     if (hdrs_end_idx == std::string::npos) {
         // incomplete or malformed request
-        throw std::runtime_error("unable to parse headers due to incomplete or malformed request");
+        throw std::runtime_error("unable to parse headers due to incomplete or malformed request headers");
     }
     std::string raw_request_headers = raw_request.substr(start_pos, hdrs_end_idx - start_pos);
     parse_headers(raw_request_headers);
