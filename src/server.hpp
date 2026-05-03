@@ -46,7 +46,7 @@ public:
 private:
     int socket_fd;
     struct io_uring ring;
-    struct io_uring_sqe *sqe; // submission queue event
+    // struct io_uring_sqe *sqe; // submission queue event
     struct io_uring_cqe *cqe; // consumption queue event
     void setup_socket();
     void setup_io_uring();

@@ -177,16 +177,16 @@ void Server::start() {
 }
 
 void Server::add_accept_request() {
-    this->sqe = io_uring_get_sqe(&ring);
+    struct io_uring_sqe *accept_sqe = io_uring_get_sqe(&this->ring);
     io_uring_prep_accept(
-        sqe,
+        accept_sqe,
         this->socket_fd,
         nullptr,
         nullptr,
         0
     );
     io_uring_sqe_set_data(
-        this->sqe,
+        accept_sqe,
         new Connection{ this->socket_fd, OpType::ACCEPT_CONNECTION }
     );
 }
