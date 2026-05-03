@@ -49,8 +49,10 @@ private:
     void setup_socket();
     void setup_io_uring();
     void add_accept_request();
-    void add_recv_request(Connection *conn, int client_fd);
-    void add_send_request(Connection *conn, int bytes_recv);
+    void add_recv_request(Connection *conn);
+    void add_send_request(Connection *conn);
     void add_close_request(Connection *conn);
-    void add_close_request(Connection *conn, int bytes_sent);
+    bool is_valid_request(Connection *conn);
+    void handle_request(Connection *conn, int bytes_recv);
+    void prepare_response(Connection *conn);
 };
