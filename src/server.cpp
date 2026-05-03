@@ -2,10 +2,12 @@
 #include "request.hpp"
 #include <array>
 #include <cstring>
+#include <exception>
 #include <iostream>
 #include <liburing.h>
 #include <liburing/io_uring.h>
 #include <netinet/in.h>
+#include <ostream>
 #include <stdexcept>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -111,54 +113,58 @@ void Server::start() {
             io_uring_submit(&this->ring);
             continue;
         }
+        try {
+            switch (conn->optype) {
+                case OpType::ACCEPT_CONNECTION:
+                    add_accept_request();
 
-        switch (conn->optype) {
-            case OpType::ACCEPT_CONNECTION:
-                add_accept_request();
+                    // set connection fd to client fd
+                    conn->fd = cqe->res;
+                    add_recv_request(conn);
 
-                // set connection fd to client fd
-                conn->fd = cqe->res;
-                add_recv_request(conn);
-
-                io_uring_submit(&this->ring);
-                break;
-            case OpType::RECV_REQUEST:
-                // nothing was sent or client closed
-                if (cqe->res == 0) {
-                    add_close_request(conn);
+                    io_uring_submit(&this->ring);
                     break;
-                }
+                case OpType::RECV_REQUEST:
+                    // nothing was sent or client closed
+                    if (cqe->res == 0) {
+                        add_close_request(conn);
+                        break;
+                    }
 
-                // receive until all required bytes are received
-                if (is_valid_request(conn)) {
-                    handle_request(conn, cqe->res);
-                    prepare_response(conn);
-                    add_send_request(conn);
-                } else {
-                    add_recv_request(conn);
-                }
+                    // receive until all required bytes are received
+                    if (is_valid_request(conn)) {
+                        handle_request(conn, cqe->res);
+                        prepare_response(conn);
+                        add_send_request(conn);
+                    } else {
+                        add_recv_request(conn);
+                    }
 
-                io_uring_submit(&this->ring);
-                break;
-            case OpType::SEND_RESPONSE:
-                std::cout << "fd=" << conn->fd << " bytes_sent=" << cqe->res << " SEND: " << conn->response->status_line << std::endl;
+                    io_uring_submit(&this->ring);
+                    break;
+                case OpType::SEND_RESPONSE:
+                    // std::cout << "fd=" << conn->fd << " bytes_sent=" << cqe->res << " SEND: " << conn->response->status_line << std::endl;
 
-                if (conn->response->keep_alive) {
-                    conn->request.reset();
-                    conn->response.reset();
-                    // go back to receiving
-                    add_recv_request(conn);
-                } else {
-                    add_close_request(conn);
-                }
+                    if (conn->response->keep_alive) {
+                        conn->request.reset();
+                        conn->response.reset();
+                        // go back to receiving
+                        add_recv_request(conn);
+                    } else {
+                        add_close_request(conn);
+                    }
 
-                io_uring_submit(&this->ring);
-                break;
-            case OpType::CLOSE_CONNECTION:
-                delete conn;
-                break;
+                    io_uring_submit(&this->ring);
+                    break;
+                case OpType::CLOSE_CONNECTION:
+                    delete conn;
+                    break;
+            }
+        } catch (std::exception& e) {
+            std::cout << "Error occured: " << e.what() << std::endl;
+            add_close_request(conn);
         }
-
+        
         io_uring_cqe_seen(&this->ring, this->cqe);
     }
 }
@@ -224,7 +230,7 @@ void Server::handle_request(Connection *conn, int bytes_recv) {
     std::string raw_request(conn->request_buffer.data(), bytes_recv);
     conn->request = std::make_unique<Request>();
     conn->request->parse_request(raw_request);
-    std::cout << "fd=" << conn->fd << " bytes_recv=" << bytes_recv << " RECV: " << conn->request->method << " " << conn->request->uri << std::endl;
+    // std::cout << "fd=" << conn->fd << " bytes_recv=" << bytes_recv << " RECV: " << conn->request->method << " " << conn->request->uri << std::endl;
 }
 
 void Server::prepare_response(Connection *conn) {
