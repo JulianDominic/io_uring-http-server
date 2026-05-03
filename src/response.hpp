@@ -13,13 +13,14 @@ class Response {
     std::string path;
     int content_length;
     void build_status_line(std::string uri);
-    void build_headers();
+    void build_headers(std::unordered_map<std::string, std::string> request_headers);
     void build_message_body();
 public:
     std::string response_str;
     std::string status_line;
     std::unordered_map<std::string, std::string> headers;
     std::string message_body;
+    bool keep_alive;
     Response(){}
     void build(Request& req);
     void prepare();

@@ -24,7 +24,7 @@ void Response::build_status_line(std::string uri) {
     this->status_line = oss.str();
 }
 
-void Response::build_headers() {
+void Response::build_headers(std::unordered_map<std::string, std::string> request_headers) {
     // TODO: handle other types
     std::string content_type = "text/html";
     if (this->path.ends_with(".ico")) {
@@ -39,8 +39,12 @@ void Response::build_headers() {
     this->headers.emplace("Content-Length", std::to_string(this->content_length));
 
     // connection header
-    // TODO: persistent HTTP
     this->headers.emplace("Connection", "close");
+    this->keep_alive = false;
+    if (request_headers.contains("Connection") && request_headers["Connection"] == "keep-alive") {
+        this->headers["Connection"] = "keep-alive";
+        this->keep_alive = true;
+    }
 }
 
 void Response::build_message_body() {
@@ -55,7 +59,7 @@ void Response::build(Request& req) {
     // build status-line
     Response::build_status_line(req.uri);
     // build headers
-    Response::build_headers();
+    Response::build_headers(req.headers);
     // build message-body
     Response::build_message_body();
 }
