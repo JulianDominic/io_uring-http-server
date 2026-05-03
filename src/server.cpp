@@ -109,8 +109,15 @@ void Server::start() {
         Connection *conn = (Connection *) io_uring_cqe_get_data(cqe);
         if (cqe->res < 0) {
             // ERROR occured
-            add_close_request(conn);
+            // don't close the server socket
+            if (conn->optype == OpType::ACCEPT_CONNECTION) {
+                delete conn;
+            } else {
+                add_close_request(conn);
+            }
             io_uring_submit(&this->ring);
+            // consume the cqe even though it is an error
+            io_uring_cqe_seen(&this->ring, this->cqe);
             continue;
         }
 
@@ -154,7 +161,7 @@ void Server::start() {
                     if (conn->response->keep_alive) {
                         conn->request.reset();
                         conn->response.reset();
-                        conn->recv_len = 0;
+                        // don't reset recv_len because of pipelining
                         // go back to receiving
                         add_recv_request(conn);
                     } else {
@@ -170,6 +177,7 @@ void Server::start() {
         } catch (std::exception& e) {
             std::cout << "Error occured: " << e.what() << std::endl;
             add_close_request(conn);
+            io_uring_submit(&this->ring);
         }
         
         io_uring_cqe_seen(&this->ring, this->cqe);
