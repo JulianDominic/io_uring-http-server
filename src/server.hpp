@@ -3,12 +3,13 @@
 #include "request.hpp"
 #include "response.hpp"
 #include <array>
+#include <cstddef>
 #include <memory>
 
 #define RECV_BUFFER_SIZE 1024
 #define DEFAULT_PORT 8080
-#define MAX_CONNECTIONS 10
-#define QUEUE_DEPTH 8
+#define MAX_CONNECTIONS 10000
+#define QUEUE_DEPTH 1024
 
 enum class OpType {
     ACCEPT_CONNECTION,
@@ -20,6 +21,7 @@ enum class OpType {
 class Connection {
 public:
     std::array<char, RECV_BUFFER_SIZE> request_buffer{};
+    size_t recv_len = 0;
     Connection(int server_fd, OpType optype);
     int fd;
     OpType optype;
@@ -52,7 +54,8 @@ private:
     void add_recv_request(Connection *conn);
     void add_send_request(Connection *conn);
     void add_close_request(Connection *conn);
-    bool is_valid_request(Connection *conn);
-    void handle_request(Connection *conn, int bytes_recv);
+    size_t find_headers_end(Connection *conn);
+    void handle_request(Connection *conn);
+    void compact_buffer(Connection* conn, size_t consumed);
     void prepare_response(Connection *conn);
 };

@@ -113,6 +113,9 @@ void Server::start() {
             io_uring_submit(&this->ring);
             continue;
         }
+
+        // can't do variable initialisation in switch-case
+        size_t headers_end;
         try {
             switch (conn->optype) {
                 case OpType::ACCEPT_CONNECTION:
@@ -130,10 +133,13 @@ void Server::start() {
                         add_close_request(conn);
                         break;
                     }
+                    conn->recv_len += cqe->res;
 
                     // receive until all required bytes are received
-                    if (is_valid_request(conn)) {
-                        handle_request(conn, cqe->res);
+                    headers_end = find_headers_end(conn);
+                    if (headers_end != std::string::npos) {
+                        handle_request(conn);
+                        compact_buffer(conn, headers_end + 4);
                         prepare_response(conn);
                         add_send_request(conn);
                     } else {
@@ -143,11 +149,12 @@ void Server::start() {
                     io_uring_submit(&this->ring);
                     break;
                 case OpType::SEND_RESPONSE:
-                    // std::cout << "fd=" << conn->fd << " bytes_sent=" << cqe->res << " SEND: " << conn->response->status_line << std::endl;
+                    std::cout << "fd=" << conn->fd << " bytes_sent=" << cqe->res << " SEND: " << conn->response->status_line << std::endl;
 
                     if (conn->response->keep_alive) {
                         conn->request.reset();
                         conn->response.reset();
+                        conn->recv_len = 0;
                         // go back to receiving
                         add_recv_request(conn);
                     } else {
@@ -191,8 +198,8 @@ void Server::add_recv_request(Connection *conn) {
     io_uring_prep_recv(
         recv_sqe,
         conn->fd,
-        conn->request_buffer.data(),
-        RECV_BUFFER_SIZE,
+        conn->request_buffer.data() + conn->recv_len, // offset because of previous recv
+        conn->request_buffer.size() - conn->recv_len, // remaining capacity
         0
     );
     io_uring_sqe_set_data(recv_sqe, conn);
@@ -220,14 +227,14 @@ void Server::add_close_request(Connection *conn) {
     io_uring_sqe_set_data(close_sqe, conn);
 }
 
-bool Server::is_valid_request(Connection *conn) {
-    std::string raw_request(conn->request_buffer.data());
-    return raw_request.find(CRLF CRLF, 0) != std::string::npos;
+size_t Server::find_headers_end(Connection *conn) {
+    std::string raw_request(conn->request_buffer.data(), conn->recv_len);
+    return raw_request.find(CRLF CRLF);
 }
 
-void Server::handle_request(Connection *conn, int bytes_recv) {
+void Server::handle_request(Connection *conn) {
     // parse the request
-    std::string raw_request(conn->request_buffer.data(), bytes_recv);
+    std::string raw_request(conn->request_buffer.data(), conn->recv_len);
     conn->request = std::make_unique<Request>();
     conn->request->parse_request(raw_request);
     // std::cout << "fd=" << conn->fd << " bytes_recv=" << bytes_recv << " RECV: " << conn->request->method << " " << conn->request->uri << std::endl;
@@ -238,4 +245,16 @@ void Server::prepare_response(Connection *conn) {
     conn->response = std::make_unique<Response>();
     conn->response->build(*conn->request);
     conn->response->prepare();
+}
+
+void Server::compact_buffer(Connection* conn, size_t consumed) {
+    size_t leftover = conn->recv_len - consumed;
+    if (leftover > 0) {
+        std::memmove(
+            conn->request_buffer.data(),
+            conn->request_buffer.data() + consumed,
+            leftover
+        );
+    }
+    conn->recv_len = leftover;
 }
