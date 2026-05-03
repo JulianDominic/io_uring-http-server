@@ -107,23 +107,23 @@ void Server::start() {
 
         // AT THIS POINT, WAIT FINISHED, CQE RECEIVED
         Connection *conn = (Connection *) io_uring_cqe_get_data(cqe);
-        if (cqe->res < 0) {
-            // ERROR occured
-            // don't close the server socket
-            if (conn->optype == OpType::ACCEPT_CONNECTION) {
-                delete conn;
-            } else {
-                add_close_request(conn);
-            }
-            io_uring_submit(&this->ring);
-            // consume the cqe even though it is an error
-            io_uring_cqe_seen(&this->ring, this->cqe);
-            continue;
-        }
-
-        // can't do variable initialisation in switch-case
-        size_t headers_end;
         try {
+            if (cqe->res < 0) {
+                // ERROR occured
+                // don't close the server socket
+                if (conn->optype == OpType::ACCEPT_CONNECTION) {
+                    delete conn;
+                } else {
+                    add_close_request(conn);
+                }
+                io_uring_submit(&this->ring);
+                // consume the cqe even though it is an error
+                io_uring_cqe_seen(&this->ring, this->cqe);
+                continue;
+            }
+
+            // can't do variable initialisation in switch-case
+            size_t headers_end;
             switch (conn->optype) {
                 case OpType::ACCEPT_CONNECTION:
                     add_accept_request();
@@ -138,6 +138,7 @@ void Server::start() {
                     // nothing was sent or client closed
                     if (cqe->res == 0) {
                         add_close_request(conn);
+                        io_uring_submit(&this->ring);
                         break;
                     }
                     conn->recv_len += cqe->res;
@@ -156,7 +157,7 @@ void Server::start() {
                     io_uring_submit(&this->ring);
                     break;
                 case OpType::SEND_RESPONSE:
-                    std::cout << "fd=" << conn->fd << " bytes_sent=" << cqe->res << " SEND: " << conn->response->status_line << std::endl;
+                    // std::cout << "fd=" << conn->fd << " bytes_sent=" << cqe->res << " SEND: " << conn->response->status_line << std::endl;
 
                     if (conn->response->keep_alive) {
                         conn->request.reset();
@@ -176,8 +177,7 @@ void Server::start() {
             }
         } catch (std::exception& e) {
             std::cout << "Error occured: " << e.what() << std::endl;
-            add_close_request(conn);
-            io_uring_submit(&this->ring);
+            delete conn;
         }
         
         io_uring_cqe_seen(&this->ring, this->cqe);
@@ -186,6 +186,9 @@ void Server::start() {
 
 void Server::add_accept_request() {
     struct io_uring_sqe *accept_sqe = io_uring_get_sqe(&this->ring);
+    if (!accept_sqe) {
+        throw std::runtime_error("SQ full, can't get SQE for accept");
+    }
     io_uring_prep_accept(
         accept_sqe,
         this->socket_fd,
@@ -203,6 +206,9 @@ void Server::add_recv_request(Connection *conn) {
     // issue the recv
     conn->optype = OpType::RECV_REQUEST;
     struct io_uring_sqe *recv_sqe = io_uring_get_sqe(&this->ring);
+    if (!recv_sqe) {
+        throw std::runtime_error("SQ full, can't get SQE for recv");
+    }
     io_uring_prep_recv(
         recv_sqe,
         conn->fd,
@@ -217,6 +223,9 @@ void Server::add_send_request(Connection *conn) {
     // issue the send
     conn->optype = OpType::SEND_RESPONSE;
     struct io_uring_sqe *send_sqe = io_uring_get_sqe(&this->ring);
+    if (!send_sqe) {
+        throw std::runtime_error("SQ full, can't get SQE for send");
+    }
     io_uring_prep_send(
         send_sqe,
         conn->fd,
@@ -231,6 +240,9 @@ void Server::add_close_request(Connection *conn) {
     // issue the close
     conn->optype = OpType::CLOSE_CONNECTION;
     struct io_uring_sqe *close_sqe = io_uring_get_sqe(&this->ring);
+    if (!close_sqe) {
+        throw std::runtime_error("SQ full, can't get SQE for close");
+    }
     io_uring_prep_close(close_sqe, conn->fd);
     io_uring_sqe_set_data(close_sqe, conn);
 }
