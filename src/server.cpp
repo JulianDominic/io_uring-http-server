@@ -254,7 +254,7 @@ size_t Server::find_headers_end(Connection *conn) {
 
 void Server::handle_request(Connection *conn) {
     // parse the request
-    std::string raw_request(conn->request_buffer.data(), conn->recv_len);
+    std::string_view raw_request(conn->request_buffer.data(), conn->recv_len);
     conn->request = std::make_unique<Request>();
     conn->request->parse_request(raw_request);
     // std::cout << "fd=" << conn->fd << " bytes_recv=" << bytes_recv << " RECV: " << conn->request->method << " " << conn->request->uri << std::endl;
