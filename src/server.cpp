@@ -81,6 +81,7 @@ Server::Server(int port) {
     this->port = port;
     setup_socket();
     setup_io_uring();
+    this->file_cache.build();
 }
 
 Server::~Server() {
@@ -159,9 +160,8 @@ void Server::start() {
                 case OpType::SEND_RESPONSE:
                     // std::cout << "fd=" << conn->fd << " bytes_sent=" << cqe->res << " SEND: " << conn->response->status_line << std::endl;
 
-                    if (conn->response->keep_alive) {
-                        conn->request.reset();
-                        conn->response.reset();
+                    if (conn->request.keep_alive) {
+                        conn->reset();
                         // don't reset recv_len because of pipelining
                         // go back to receiving
                         add_recv_request(conn);
@@ -229,8 +229,8 @@ void Server::add_send_request(Connection *conn) {
     io_uring_prep_send(
         send_sqe,
         conn->fd,
-        conn->response->response_str.data(),
-        conn->response->response_str.size(),
+        conn->response.response_str.data(),
+        conn->response.response_str.size(),
         0
     );
     io_uring_sqe_set_data(send_sqe, conn);
@@ -255,16 +255,13 @@ size_t Server::find_headers_end(Connection *conn) {
 void Server::handle_request(Connection *conn) {
     // parse the request
     std::string_view raw_request(conn->request_buffer.data(), conn->recv_len);
-    conn->request = std::make_unique<Request>();
-    conn->request->parse_request(raw_request);
+    conn->request.parse_request(raw_request);
     // std::cout << "fd=" << conn->fd << " bytes_recv=" << bytes_recv << " RECV: " << conn->request->method << " " << conn->request->uri << std::endl;
 }
 
 void Server::prepare_response(Connection *conn) {
     // build the response
-    conn->response = std::make_unique<Response>();
-    conn->response->build(*conn->request);
-    conn->response->prepare();
+    conn->response.build(conn->request, this->file_cache);
 }
 
 void Server::compact_buffer(Connection* conn, size_t consumed) {

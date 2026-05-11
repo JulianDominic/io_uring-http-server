@@ -1,6 +1,8 @@
 #include "request.hpp"
 #include <cstddef>
 #include <cstring>
+#include <iostream>
+#include <ostream>
 #include <stdexcept>
 #include <string_view>
 #include "http_method.hpp"
@@ -71,7 +73,6 @@ void Request::parse_request_line(std::string_view request_line) {
 
 void Request::parse_headers(std::string_view headers) {
     // for each header, they end with CRLF
-
     size_t start_pos = 0;
     size_t end_pos =  headers.find(CRLF);
     while (start_pos < headers.size()) {
@@ -85,7 +86,7 @@ void Request::parse_headers(std::string_view headers) {
         if (colon_pos == std::string_view::npos) {
             throw std::runtime_error("malformed header, `: ` not found");
         }
-        std::string_view header_name = header.substr(start_pos, colon_pos);
+        std::string_view header_name = header.substr(0, colon_pos);
         std::string_view header_value = header.substr(colon_pos + 2);
         if (header_name == "Connection") {
             if (header_value == "keep-alive") {

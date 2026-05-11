@@ -1,10 +1,10 @@
 #pragma once
+#include "filecache.hpp"
 #include "liburing.h"
 #include "request.hpp"
 #include "response.hpp"
 #include <array>
 #include <cstddef>
-#include <memory>
 
 #define RECV_BUFFER_SIZE 1024
 #define DEFAULT_PORT 8080
@@ -20,13 +20,14 @@ enum class OpType {
 
 class Connection {
 public:
+    void reset();
     std::array<char, RECV_BUFFER_SIZE> request_buffer{};
     size_t recv_len = 0;
     Connection(int server_fd, OpType optype);
     int fd;
     OpType optype;
-    std::unique_ptr<Request> request;
-    std::unique_ptr<Response> response;
+    Request request;
+    Response response;
 };
 
 inline Connection::Connection(int server_fd, OpType optype) {
@@ -34,8 +35,14 @@ inline Connection::Connection(int server_fd, OpType optype) {
     this->optype = optype;
 }
 
+inline void Connection::reset() {
+    this->request.reset();
+    this->response.reset();
+}
+
 class Server {
 public:
+    FileCache file_cache;
     int port;
     Server();
     Server(int port);
