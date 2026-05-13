@@ -121,7 +121,6 @@ void Server::start() {
                 }
 
                 // can't do variable initialisation in switch-case
-                size_t headers_end;
                 switch (conn->optype) {
                     case OpType::ACCEPT_CONNECTION:
                         add_accept_request();
@@ -136,24 +135,14 @@ void Server::start() {
                             add_close_request(conn);
                             break;
                         }
-                        conn->recv_len += res;
-
                         // receive until all required bytes are received
-                        headers_end = find_headers_end(conn);
-                        if (headers_end != std::string::npos) {
-                            handle_request(conn);
-                            prepare_response(conn);
-                            compact_buffer(conn, headers_end + 4);
-                            add_send_request(conn);
-                        } else {
-                            add_recv_request(conn);
-                        }
+                        handle_request(conn);
+                        prepare_response(conn);
+                        add_send_request(conn);
                         break;
                     case OpType::SEND_RESPONSE:
                         if (conn->request.keep_alive) {
                             conn->reset();
-                            // don't reset recv_len because of pipelining
-                            // go back to receiving
                             add_recv_request(conn);
                         } else {
                             add_close_request(conn);
@@ -201,8 +190,8 @@ void Server::add_recv_request(Connection *conn) {
     io_uring_prep_recv(
         recv_sqe,
         conn->fd,
-        conn->request_buffer.data() + conn->recv_len, // offset because of previous recv
-        conn->request_buffer.size() - conn->recv_len, // remaining capacity
+        conn->request_buffer.data(),
+        conn->request_buffer.size(),
         0
     );
     io_uring_sqe_set_data(recv_sqe, conn);
@@ -237,29 +226,17 @@ void Server::add_close_request(Connection *conn) {
 }
 
 size_t Server::find_headers_end(Connection *conn) {
-    std::string_view raw_request(conn->request_buffer.data(), conn->recv_len);
+    std::string_view raw_request(conn->request_buffer.data(), conn->request_buffer.size());
     return raw_request.find(CRLF CRLF);
 }
 
 void Server::handle_request(Connection *conn) {
     // parse the request
-    std::string_view raw_request(conn->request_buffer.data(), conn->recv_len);
+    std::string_view raw_request(conn->request_buffer.data(), conn->request_buffer.size());
     conn->request.parse_request(raw_request);
 }
 
 void Server::prepare_response(Connection *conn) {
     // build the response
     conn->response.build(conn->request, this->file_cache);
-}
-
-void Server::compact_buffer(Connection* conn, size_t consumed) {
-    size_t leftover = conn->recv_len - consumed;
-    if (leftover > 0) {
-        std::memmove(
-            conn->request_buffer.data(),
-            conn->request_buffer.data() + consumed,
-            leftover
-        );
-    }
-    conn->recv_len = leftover;
 }

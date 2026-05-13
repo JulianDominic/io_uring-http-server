@@ -23,7 +23,6 @@ class Connection {
 public:
     void reset();
     std::array<char, RECV_BUFFER_SIZE> request_buffer{};
-    size_t recv_len = 0;
     Connection(int server_fd, OpType optype);
     int fd;
     OpType optype;
