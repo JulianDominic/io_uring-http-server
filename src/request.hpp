@@ -1,6 +1,4 @@
 #pragma once
-#include <string>
-#include <unordered_map>
 #include "http_method.hpp"
 
 #define CRLF "\r\n"
@@ -11,7 +9,7 @@ public:
     bool keep_alive;
     HTTPMethod method;
     std::string_view uri;
-    std::unordered_map<std::string, std::string> headers;
+    // std::unordered_map<std::string, std::string> headers;
     std::string_view body;
     Request(){};
     void parse_request(std::string_view);
@@ -26,6 +24,6 @@ inline void Request::reset() {
     this->method = HTTPMethod::UNKNOWN;
     keep_alive = false;
     uri = {};
-    headers = {};
+    // headers = {};
     body = {};
 }

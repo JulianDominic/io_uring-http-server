@@ -1,8 +1,6 @@
 #include "request.hpp"
 #include <cstddef>
 #include <cstring>
-#include <iostream>
-#include <ostream>
 #include <stdexcept>
 #include <string_view>
 #include "http_method.hpp"
@@ -95,7 +93,7 @@ void Request::parse_headers(std::string_view headers) {
                 this->keep_alive = false;
             }
         }
-        this->headers.emplace(header_name, header_value);
+        // this->headers.emplace(header_name, header_value);
 
         start_pos = end_pos + 2;
         end_pos = headers.find(CRLF, start_pos);
