@@ -154,6 +154,7 @@ void Server::start() {
                 }
             } catch (std::exception& e) {
                 std::cout << "Error occured: " << e.what() << std::endl;
+                close(conn->fd);
                 delete conn;
             }
         }
