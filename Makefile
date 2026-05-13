@@ -1,4 +1,4 @@
-CC = clang++-20
+CC = clang++
 # -MMD and -MP help me track dependencies for changes in .hpp
 CFLAGS = -Wall -std=c++26 -MMD -MP
 LDLIBS = -luring
