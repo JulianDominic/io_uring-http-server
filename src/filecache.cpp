@@ -5,11 +5,11 @@
 #include <stdexcept>
 
 bool FileCache::contains(std::string_view uri) {
-    return this->cache.contains(uri.data());
+    return this->cache.contains(std::string(uri));
 }
 
 CachedFile FileCache::get(std::string_view  uri) {
-    return this->cache[uri.data()];
+    return this->cache[std::string(uri)];
 }
 
 std::string get_content_type(std::string filepath) {

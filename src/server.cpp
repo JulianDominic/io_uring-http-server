@@ -142,8 +142,8 @@ void Server::start() {
                         headers_end = find_headers_end(conn);
                         if (headers_end != std::string::npos) {
                             handle_request(conn);
-                            compact_buffer(conn, headers_end + 4);
                             prepare_response(conn);
+                            compact_buffer(conn, headers_end + 4);
                             add_send_request(conn);
                         } else {
                             add_recv_request(conn);
