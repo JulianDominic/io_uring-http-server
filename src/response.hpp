@@ -10,6 +10,7 @@
 
 class Response {
 public:
+    Response() { response_str.reserve(RES_SIZE); }
     HTTPStatusCode status_code;
     std::string response_str;
     void build(Request& req, FileCache& fc);
