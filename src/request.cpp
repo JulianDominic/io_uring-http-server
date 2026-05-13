@@ -31,11 +31,6 @@ void Request::parse_request(std::string_view raw_request) {
     // +2 to include the last header's CRLF
     std::string_view headers = raw_request.substr(start_pos, end_pos - start_pos + 2);
     parse_headers(headers);
-
-    // parse the body
-    start_pos = end_pos + 4; // CRLF CRLF = 4 bytes
-    std::string_view body = raw_request.substr(start_pos);
-    parse_body(body);
 }
 
 void Request::parse_request_line(std::string_view request_line) {
@@ -49,8 +44,6 @@ void Request::parse_request_line(std::string_view request_line) {
     std::string_view method = request_line.substr(0, sp1);
     if (method == "GET") {
         this->method = HTTPMethod::GET;
-    } else if (method == "POST") {
-        this->method = HTTPMethod::POST;
     } else {
         this->method = HTTPMethod::UNKNOWN;
     }
@@ -94,9 +87,4 @@ void Request::parse_headers(std::string_view headers) {
         start_pos = end_pos + 2;
         end_pos = headers.find(CRLF, start_pos);
     }
-}
-
-void Request::parse_body(std::string_view body) {
-    // TODO: parse JSON for POST requests
-    this->body = body;
 }
