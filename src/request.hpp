@@ -6,7 +6,7 @@
 
 class Request {
 public:
-    bool keep_alive;
+    bool keep_alive = true;
     HTTPMethod method;
     std::string_view uri;
     // std::unordered_map<std::string, std::string> headers;

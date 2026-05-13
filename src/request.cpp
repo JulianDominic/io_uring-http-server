@@ -86,12 +86,8 @@ void Request::parse_headers(std::string_view headers) {
         }
         std::string_view header_name = header.substr(0, colon_pos);
         std::string_view header_value = header.substr(colon_pos + 2);
-        if (header_name == "Connection") {
-            if (header_value == "keep-alive") {
-                this->keep_alive = true;
-            } else {
-                this->keep_alive = false;
-            }
+        if (header_name == "Connection" && header_value == "close") {
+            this->keep_alive = false;
         }
         // this->headers.emplace(header_name, header_value);
 
