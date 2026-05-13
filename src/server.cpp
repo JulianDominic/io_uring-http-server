@@ -94,93 +94,82 @@ void Server::start() {
 
     // create the first accept request
     add_accept_request();
-    // submit sqe to the ring
-    io_uring_submit(&this->ring);
+    std::array<struct io_uring_cqe *, CQE_BATCH> cqes{};
 
     while (true) {
-        int wait_cqe_ret = io_uring_wait_cqe(
-            &this->ring,
-            &this->cqe
-        );
-        if (wait_cqe_ret < 0) {
-            throw std::runtime_error("failed to wait cqe");
+        int submit_ret = io_uring_submit_and_wait(&this->ring, 1);
+        if (submit_ret < 0) {
+            throw std::runtime_error("failed to submit and wait io_uring");
         }
 
-        // AT THIS POINT, WAIT FINISHED, CQE RECEIVED
-        Connection *conn = (Connection *) io_uring_cqe_get_data(cqe);
-        try {
-            if (cqe->res < 0) {
-                // ERROR occured
-                // don't close the server socket
-                if (conn->optype == OpType::ACCEPT_CONNECTION) {
-                    delete conn;
-                } else {
-                    add_close_request(conn);
+        unsigned count = io_uring_peek_batch_cqe(&this->ring, cqes.data(), CQE_BATCH);
+        for (int i = 0; i < count; i++) {
+            // AT THIS POINT, WAIT FINISHED, CQE RECEIVED
+            struct io_uring_cqe *cqe = cqes[i];
+            Connection *conn = (Connection *) io_uring_cqe_get_data(cqe);
+            int res = cqe->res;
+            try {
+                if (res < 0) {
+                    // ERROR occured
+                    // don't close the server socket
+                    if (conn->optype == OpType::ACCEPT_CONNECTION) {
+                        delete conn;
+                    } else {
+                        add_close_request(conn);
+                    }
+                    continue;
                 }
-                io_uring_submit(&this->ring);
-                // consume the cqe even though it is an error
-                io_uring_cqe_seen(&this->ring, this->cqe);
-                continue;
-            }
 
-            // can't do variable initialisation in switch-case
-            size_t headers_end;
-            switch (conn->optype) {
-                case OpType::ACCEPT_CONNECTION:
-                    add_accept_request();
+                // can't do variable initialisation in switch-case
+                size_t headers_end;
+                switch (conn->optype) {
+                    case OpType::ACCEPT_CONNECTION:
+                        add_accept_request();
 
-                    // set connection fd to client fd
-                    conn->fd = cqe->res;
-                    add_recv_request(conn);
-
-                    io_uring_submit(&this->ring);
-                    break;
-                case OpType::RECV_REQUEST:
-                    // nothing was sent or client closed
-                    if (cqe->res == 0) {
-                        add_close_request(conn);
-                        io_uring_submit(&this->ring);
+                        // set connection fd to client fd
+                        conn->fd = res;
+                        add_recv_request(conn);
                         break;
-                    }
-                    conn->recv_len += cqe->res;
+                    case OpType::RECV_REQUEST:
+                        // nothing was sent or client closed
+                        if (res == 0) {
+                            add_close_request(conn);
+                            break;
+                        }
+                        conn->recv_len += res;
 
-                    // receive until all required bytes are received
-                    headers_end = find_headers_end(conn);
-                    if (headers_end != std::string::npos) {
-                        handle_request(conn);
-                        compact_buffer(conn, headers_end + 4);
-                        prepare_response(conn);
-                        add_send_request(conn);
-                    } else {
-                        add_recv_request(conn);
-                    }
-
-                    io_uring_submit(&this->ring);
-                    break;
-                case OpType::SEND_RESPONSE:
-                    // std::cout << "fd=" << conn->fd << " bytes_sent=" << cqe->res << " SEND: " << conn->response->status_line << std::endl;
-
-                    if (conn->request.keep_alive) {
-                        conn->reset();
-                        // don't reset recv_len because of pipelining
-                        // go back to receiving
-                        add_recv_request(conn);
-                    } else {
-                        add_close_request(conn);
-                    }
-
-                    io_uring_submit(&this->ring);
-                    break;
-                case OpType::CLOSE_CONNECTION:
-                    delete conn;
-                    break;
+                        // receive until all required bytes are received
+                        headers_end = find_headers_end(conn);
+                        if (headers_end != std::string::npos) {
+                            handle_request(conn);
+                            compact_buffer(conn, headers_end + 4);
+                            prepare_response(conn);
+                            add_send_request(conn);
+                        } else {
+                            add_recv_request(conn);
+                        }
+                        break;
+                    case OpType::SEND_RESPONSE:
+                        if (conn->request.keep_alive) {
+                            conn->reset();
+                            // don't reset recv_len because of pipelining
+                            // go back to receiving
+                            add_recv_request(conn);
+                        } else {
+                            add_close_request(conn);
+                        }
+                        break;
+                    case OpType::CLOSE_CONNECTION:
+                        delete conn;
+                        break;
+                }
+            } catch (std::exception& e) {
+                std::cout << "Error occured: " << e.what() << std::endl;
+                delete conn;
             }
-        } catch (std::exception& e) {
-            std::cout << "Error occured: " << e.what() << std::endl;
-            delete conn;
         }
         
-        io_uring_cqe_seen(&this->ring, this->cqe);
+        io_uring_cq_advance(&this->ring, count);
     }
 }
 
@@ -248,7 +237,7 @@ void Server::add_close_request(Connection *conn) {
 }
 
 size_t Server::find_headers_end(Connection *conn) {
-    std::string raw_request(conn->request_buffer.data(), conn->recv_len);
+    std::string_view raw_request(conn->request_buffer.data(), conn->recv_len);
     return raw_request.find(CRLF CRLF);
 }
 
@@ -256,7 +245,6 @@ void Server::handle_request(Connection *conn) {
     // parse the request
     std::string_view raw_request(conn->request_buffer.data(), conn->recv_len);
     conn->request.parse_request(raw_request);
-    // std::cout << "fd=" << conn->fd << " bytes_recv=" << bytes_recv << " RECV: " << conn->request->method << " " << conn->request->uri << std::endl;
 }
 
 void Server::prepare_response(Connection *conn) {

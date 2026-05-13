@@ -10,6 +10,7 @@
 #define DEFAULT_PORT 8080
 #define MAX_CONNECTIONS 10000
 #define QUEUE_DEPTH 1024
+#define CQE_BATCH 256
 
 enum class OpType {
     ACCEPT_CONNECTION,
@@ -53,8 +54,6 @@ public:
 private:
     int socket_fd;
     struct io_uring ring;
-    // struct io_uring_sqe *sqe; // submission queue event
-    struct io_uring_cqe *cqe; // consumption queue event
     void setup_socket();
     void setup_io_uring();
     void add_accept_request();
