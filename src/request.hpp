@@ -19,6 +19,6 @@ public:
 
 inline void Request::reset() {
     this->method = HTTPMethod::UNKNOWN;
-    keep_alive = false;
+    keep_alive = true;
     uri = {};
 }
