@@ -8,7 +8,7 @@ bool FileCache::contains(std::string_view uri) {
     return this->cache.contains(std::string(uri));
 }
 
-CachedFile FileCache::get(std::string_view  uri) {
+const CachedFile& FileCache::get(std::string_view  uri) {
     return this->cache[std::string(uri)];
 }
 

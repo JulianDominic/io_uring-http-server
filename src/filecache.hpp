@@ -16,6 +16,6 @@ class FileCache {
     std::unordered_map<std::string, CachedFile> cache;
 public:
     bool contains(std::string_view);
-    CachedFile get(std::string_view);
+    const CachedFile& get(std::string_view);
     void build();
 };
